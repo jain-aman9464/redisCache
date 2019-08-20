@@ -9,7 +9,7 @@ const app = express();
 const db = require('./models');
 
 let client = redis.createClient();
-
+console.time('Query_Time');
 client.on('connect', function () {
   console.log('Connected to Redis. . .');
 })
@@ -47,6 +47,7 @@ app.post('/user/search', function (req, res, next) {
           });
         }
         else {
+          console.timeEnd('Query_Time')
           console.log('Rendered data from DB');
           console.log('Pushing this data to cache. . .');
 
@@ -59,6 +60,7 @@ app.post('/user/search', function (req, res, next) {
             if (err)
               console.log('Error pushing data into cache: ', err);
             console.log(reply);
+            client.expire(id, 40);
           });
           res.render('details', {
             user: result[0]
@@ -81,25 +83,6 @@ app.get('/user/add', function (req, res, next) {
   res.render('adduser');
 });
 
-//Add a new user into DB
-app.post('/user/add', function (req, res, next) {
-  let id = req.body.id;
-  let first_name = req.body.first_name;
-  let last_name = req.body.last_name;
-  let email = req.body.email;
-  let phone = req.body.phone;
-
-  db.users.create({
-    user_id: id,
-    first_name: first_name,
-    last_name: last_name,
-    email: email,
-    phone: phone
-  }).then(function (users) {
-    res.redirect('/');
-  });
-});
-
 app.post('/user/add', function (req, res, next) {
   let id = req.body.id;
   let first_name = req.body.first_name;
@@ -115,9 +98,17 @@ app.post('/user/add', function (req, res, next) {
   ], function (err, reply) {
     if (err)
       console.log(err);
-
+      client.expire(id, 40); // expiry time = 40 secs  
     console.log(reply);
-    res.redirect('/');
+    db.users.create({
+      user_id: id,
+      first_name: first_name,
+      last_name: last_name,
+      email: email,
+      phone: phone
+    }).then(function (users) {
+      res.redirect('/');
+    });
   });
 });
 
